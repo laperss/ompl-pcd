@@ -6,7 +6,7 @@
 
 #include "ompl/geometric/planners/PlannerIncludes.h"
 #include "Cell.h"
-
+#include <ompl/base/Planner.h>
 
 using namespace std;
 namespace ob = ompl::base;
@@ -19,7 +19,6 @@ namespace ompl
 	// FORWARD DECLARATION
 	// split advisor is not used at this point
 	class SplitAdvisor;
-
 	class PCD: public ob::Planner
 	{
 	public:	
@@ -38,8 +37,11 @@ namespace ompl
 	    bool setSplitAdvisor(const SplitAdvisor& advisor);
 	    const ob::State* findNearestSample(const ob::State*                     state,
 					       const std::vector<const ob::State*>  samples);
-	    vector<Cell*>   cell_division_;
-
+	    vector<Cell*> cell_division_;
+	    struct SpaceBounds {
+	        vector<double> min;
+	        vector<double> max;
+	    } ;
 	private:
 	    bool                           findCellPath(CellPath& cell_path);
 	    SplitAdvisor*                  split_advisor_;
@@ -60,6 +62,7 @@ namespace ompl
 	    void  sampleOccCell(Cell& occ_cell, unsigned int max_num_tries = 10);
 	    Cell& getNonMixedCell(Cell& cell, const ob::State* state);
 	    void  sampleFreeCells();
+	    void  getSpaceLimits(ob::StateSpacePtr stateSpace, SpaceBounds& bounds);
 
 	    void  getAllCells(vector<Cell*>& cells, Cell* node);
 	    void  splitCell(Cell&             cell,
@@ -81,16 +84,16 @@ namespace ompl
 	protected:
 	    RNG                           rng_;
 	    ob::StateSamplerPtr           sampler_;
-	    std::vector<double>           max_bound_;
-	    std::vector<double>           min_bound_;
+
 	    PCD_Graph                     pcd_graph_; // structure containing all (current?) cells
 	    unsigned int                  astar_timer_;    
 	    int                           max_num_it;
-	    boost::posix_time::ptime      start_time;
 	    const  ob::State*             start_ptr;
 	    const  ob::State*             goal_ptr;
 	    double                        goalBias_;
 	    double                        minValidPathFraction_;
+	    SpaceBounds                   spaceBounds_;
+
 	};
 
     } // namespace geometric

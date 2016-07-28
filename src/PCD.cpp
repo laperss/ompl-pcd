@@ -2,8 +2,9 @@
 #include "../Cell.h"
 #include "../SplitAdvisor.h"
 
-#include <iostream>
 #include <ompl/base/spaces/RealVectorStateSpace.h>
+#include <boost/math/constants/constants.hpp>
+#include <iostream>
 
 #define DEF_MAX_NEW_FREE_CELLS 10
 #define DEF_MAX_NUM_ITER 100000
@@ -21,42 +22,41 @@ og::PCD::PCD(const ob::SpaceInformationPtr &si, vector<Cell*>& cell_division) :
     cell_division_(cell_division)
 {
     Cell::setSI(si);
-	
     // Planner specs
     Planner::specs_.multithreaded = false;
-    Planner::specs_.approximateSolutions = false; //For now!
+    Planner::specs_.approximateSolutions = false;
     Planner::specs_.optimizingPaths = false;
     Planner::specs_.directed = false;
     Planner::specs_.provingSolutionNonExistence = false;
 }
 
-og::PCD::PCD(const ob::SpaceInformationPtr &si) : 
-    ob::Planner(si, "PCD"),
-    astar_timer_(0),
-    pcd_graph_(0),
-    max_num_iter_(DEF_MAX_NUM_ITER),
+    og::PCD::PCD(const ob::SpaceInformationPtr &si) : 
+	ob::Planner(si, "PCD"),
+	astar_timer_(0),
+	pcd_graph_(0),
+	max_num_iter_(DEF_MAX_NUM_ITER),
 
-    max_new_free_cells_(DEF_MAX_NEW_FREE_CELLS),
-    split_advisor_(0),
-    max_step_size_(1.0 *3.14/180),
-    cell_division_(0)
-{
-    Cell::setSI(si);  // makes it possible to access si_ in cell
-    Planner::specs_.multithreaded = false;
-    Planner::specs_.approximateSolutions = false; 
-    Planner::specs_.optimizingPaths = false;
-    Planner::specs_.directed = false;
-    Planner::specs_.provingSolutionNonExistence = false;
-}
+	max_new_free_cells_(DEF_MAX_NEW_FREE_CELLS),
+	split_advisor_(0),
+	max_step_size_(1.0 *3.14/180),
+	cell_division_(0)
+    {
+	Cell::setSI(si);  // makes it possible to access si_ in cell
+	Planner::specs_.multithreaded = false;
+	Planner::specs_.approximateSolutions = false; 
+	Planner::specs_.optimizingPaths = false;
+	Planner::specs_.directed = false;
+	Planner::specs_.provingSolutionNonExistence = false;
+    }
 
 // free memory in destructor
 og::PCD::~PCD()
 {
     freeMemory();
 }
-
 void ompl::geometric::PCD::freeMemory()
 {
+    1;
 }
 
 // =============================== PROBLEM SETUP ========================================
@@ -68,14 +68,47 @@ void og::PCD::setProblemDefinition(const ob::ProblemDefinitionPtr &pdef)
 void og::PCD::setup()
 {
     Planner::setup();
-    // THIS IS NOW DEPENDENT ON THE STATE SPACE AND MUST BE CHANGED!
-    const ob::RealVectorBounds & bounds = si_->getStateSpace()->as<ob::RealVectorStateSpace>()->getBounds () ;
-    
-    min_bound_ = bounds.low ;
-    max_bound_ = bounds.high ;
+    getSpaceLimits(si_->getStateSpace(), spaceBounds_);
     split_directions_.assign(2, true);
     Cell::destroyGraph(pcd_graph_);
 }
+
+void og::PCD::getSpaceLimits(ob::StateSpacePtr stateSpace, og::PCD::SpaceBounds& bounds)
+{
+    ob::CompoundStateSpace* compoundSpace = stateSpace->as<ob::CompoundStateSpace>();
+    if (stateSpace->isCompound())
+    {
+	for(unsigned int i = 0; i < compoundSpace->getSubspaceCount(); ++i) {
+	    ob::StateSpacePtr subspace = compoundSpace->getSubspace(i);
+	    getSpaceLimits(subspace, bounds);
+	}
+    } else 
+    {
+	assert(stateSpace->getType() == ob::STATE_SPACE_SO2 
+	       || stateSpace->getType() == ob::STATE_SPACE_SO3 
+	       || stateSpace->getType() == ob::STATE_SPACE_REAL_VECTOR);
+	if (stateSpace->getType() == ob::STATE_SPACE_REAL_VECTOR)
+	{
+	    const ob::RealVectorBounds& rv = stateSpace->as<ob::RealVectorStateSpace>()->getBounds () ;
+	    for (unsigned int i = 0;i < stateSpace->getDimension();++i)
+	    {
+		bounds.min.push_back(rv.low[i]);
+		bounds.max.push_back(rv.high[i]);
+	    }
+	} else if (stateSpace->getType() == ob::STATE_SPACE_SO2 
+		   || stateSpace->getType() == ob::STATE_SPACE_SO3)
+	{
+	    for (unsigned int i = 0;i < stateSpace->getDimension();++i)
+	    {
+		bounds.min.push_back(-boost::math::constants::pi<double>());
+		bounds.max.push_back( boost::math::constants::pi<double>());
+	    }
+	}
+    }
+}
+
+
+
 
 bool og::PCD::setSplitAdvisor(const og::SplitAdvisor& advisor)
 {
@@ -108,15 +141,11 @@ ob::PlannerStatus og::PCD::solve(const ob::PlannerTerminationCondition &ptc)
     bool success            = false;
     bool approximate        = false;
     unsigned int num_iter   = 0;
-
-    start_time = ompl::time::now();
-    start_ptr =   pis_.nextStart();
+    start_ptr =   pis_.nextStart();  
     goal_ptr  =   pis_.nextGoal();
-
     assert(isSatisfied(start_ptr));
     assert(isSatisfied(goal_ptr));
-    
-    pcd_graph_ = Cell::createGraph(start_ptr,goal_ptr,min_bound_,max_bound_);
+    pcd_graph_ = Cell::createGraph(start_ptr,goal_ptr,spaceBounds_.min,spaceBounds_.max);
  
     checkValidity();
     while ((num_iter < max_num_iter_) && !success) 
@@ -127,10 +156,14 @@ ob::PlannerStatus og::PCD::solve(const ob::PlannerTerminationCondition &ptc)
 	{
 	    cout << "* get cell path\n";
 	    Cell::getPath(cell_path);
-	    cout << "(";
+	    cout << "* found possible path: (";
 	    for(int i=0; i<cell_path.size();++i)
-		cout << cell_path[i].cell->getID()<< ", ";
-	    cout << ")\n";
+	    {
+		if (i != cell_path.size()-1)
+		    cout << cell_path[i].cell->getID()<< ", ";
+		else
+		    cout << cell_path[i].cell->getID()<< ")\n";
+	    }
 	    if (checkPath(cell_path)) 
 	    {
 		success = true;
@@ -600,7 +633,6 @@ bool og::PCD::findSplitDirection(const ob::State*    state1,
 				 const Cell&         cell,
 				 unsigned int&       split_coord_indx) const
 {
-
     int  dim = si_->getStateDimension();
     bool split_found          = false;
     unsigned int num_failures = 0;
@@ -620,7 +652,7 @@ bool og::PCD::findSplitDirection(const ob::State*    state1,
 		if (diff > epsilon) 
 		{
 		    // normalize with the range of this DOF
-   		    diff /= ( max_bound_[i] - min_bound_[i]);
+   		    diff /= ( spaceBounds_.max[i] - spaceBounds_.min[i]);
    		    if (diff > max_diff) {
    			max_diff         = diff;
    			split_coord_indx = i;
@@ -639,7 +671,6 @@ bool og::PCD::findSplitDirection(const ob::State*    state1,
     return split_found;
 }
 
-
 void og::PCD::getAllCells(vector<Cell*>& cells, Cell* node)
 {
     if (node->lo_child_ == 0 && node->up_child_ == 0) 
@@ -652,9 +683,7 @@ void og::PCD::getAllCells(vector<Cell*>& cells, Cell* node)
 	if(node->up_child_ != 0)
 	    getAllCells(cells, node->up_child_);
     }
-
 }
-
 
 // ============================= SAMPLE FUNCITONS ====================================
 
@@ -767,7 +796,7 @@ void og::PCD::sampleOccCells()
     }
     random_shuffle(bridgeCells.begin(), bridgeCells.end());
 
-    // Use a random number to determine whether we will use bridge-cell sampling or not.
+    //  use bridge-cell sampling or not?
     const unsigned int numObstCells      = obstCells.size();
     const unsigned int numBridgeCells    = bridgeCells.size();
     const unsigned int max_bridge_trials = (rng_.uniform01() < 0.8)? 10 : 0; // 30
@@ -887,4 +916,3 @@ void og::PCD::sampleFreeCells()
     }
     return;
 }
-
