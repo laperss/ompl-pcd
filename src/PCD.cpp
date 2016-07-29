@@ -69,7 +69,7 @@ void og::PCD::setup()
 {
     Planner::setup();
     getSpaceLimits(si_->getStateSpace(), spaceBounds_);
-    split_directions_.assign(2, true);
+    split_directions_.assign(spaceBounds_.min.size(), true);
     Cell::destroyGraph(pcd_graph_);
 }
 
@@ -476,11 +476,8 @@ void  og::PCD::splitCell(Cell&              cell,
 			 vector<bool>       valid_directions,
 			 PCD_Graph&         cell_graph)
 {
-    cout << "* split cell "<< cell.getID() <<"\n";
-
     const unsigned int  dim = si_->getStateDimension();
     // preconditions
-
     assert(valid_directions.size() == dim);
     assert(find(valid_directions.begin(), valid_directions.end(), true) != valid_directions.end());
     assert(cell.parent_ == 0 || cell.parent_->type_ == Cell::MIXED);
