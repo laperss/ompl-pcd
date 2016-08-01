@@ -18,7 +18,6 @@ namespace ompl
     {
 	// FORWARD DECLARATION
 	// split advisor is not used at this point
-	class SplitAdvisor;
 	class PCD: public ob::Planner
 	{
 	public:	
@@ -34,7 +33,6 @@ namespace ompl
 	    void freeMemory();
 	    void sample_path();
 
-	    bool setSplitAdvisor(const SplitAdvisor& advisor);
 	    const ob::State* findNearestSample(const ob::State*                     state,
 					       const std::vector<const ob::State*>  samples);
 	    vector<Cell*> cell_division_;
@@ -44,7 +42,6 @@ namespace ompl
 	    } ;
 	private:
 	    bool                           findCellPath(CellPath& cell_path);
-	    SplitAdvisor*                  split_advisor_;
 	    std::vector<bool>              split_directions_;
 	    std::vector<double>            range_vals_;
 	    double                         max_step_size_;

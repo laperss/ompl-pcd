@@ -1,6 +1,5 @@
 #include "../PCD.h"
 #include "../Cell.h"
-#include "../SplitAdvisor.h"
 
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <boost/math/constants/constants.hpp>
@@ -17,7 +16,6 @@ og::PCD::PCD(const ob::SpaceInformationPtr &si, vector<Cell*>& cell_division) :
     max_num_iter_(DEF_MAX_NUM_ITER),
 
     max_new_free_cells_(DEF_MAX_NEW_FREE_CELLS),
-    split_advisor_(0),
     max_step_size_(1.0 *3.14/180),
     cell_division_(cell_division)
 {
@@ -37,7 +35,6 @@ og::PCD::PCD(const ob::SpaceInformationPtr &si, vector<Cell*>& cell_division) :
 	max_num_iter_(DEF_MAX_NUM_ITER),
 
 	max_new_free_cells_(DEF_MAX_NEW_FREE_CELLS),
-	split_advisor_(0),
 	max_step_size_(1.0 *3.14/180),
 	cell_division_(0)
     {
@@ -108,17 +105,6 @@ void og::PCD::getSpaceLimits(ob::StateSpacePtr stateSpace, og::PCD::SpaceBounds&
 }
 
 
-
-
-bool og::PCD::setSplitAdvisor(const og::SplitAdvisor& advisor)
-{
-    og::SplitAdvisor* const tmp = new og::SplitAdvisor(advisor);
-    if (split_advisor_ != 0) 
-	delete split_advisor_;
-    split_advisor_ = tmp;
-    return true;
-}
-
 void og::PCD::clear()
 {
     Planner::clear();
@@ -152,7 +138,8 @@ ob::PlannerStatus og::PCD::solve(const ob::PlannerTerminationCondition &ptc)
     {
 	++num_iter;
 	cout << "\n* find cell path\n";
-	if (findCellPath(cell_path)) 
+	found_path = (findCellPath(cell_path)); 
+	if (found_path)
 	{
 	    cout << "* get cell path\n";
 	    Cell::getPath(cell_path);
@@ -181,7 +168,6 @@ ob::PlannerStatus og::PCD::solve(const ob::PlannerTerminationCondition &ptc)
 		sampleOccCells();		
 	    }	
 	}
-	cout << "\n";
     }
     if (success == true)
     {
@@ -707,18 +693,6 @@ const ob::State* og::PCD::findNearestSample(const ob::State*  state,
 bool og::PCD::isSatisfied(const ob::State* state)	
 {
     const bool satisfied = si_->isValid(state); 
-    if (split_advisor_ != 0) 
-    {
-	// only use the advisor for configurations that are colliding
-	if (!satisfied) 
-	{
-	    // NOT IMPLEMENTED YET
-	    //split_advisor_->GetSplitDirections(split_directions_);
-	    split_directions_.assign(split_directions_.size(), true);
-	} else {
-	    split_directions_.assign(split_directions_.size(), true);
-	}
-    }
     return satisfied;
 }
 
