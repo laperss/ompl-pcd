@@ -168,16 +168,11 @@ bool Cell::strictlyContains(const ob::State* config) const
 {
     ob::ScopedState<> scoped_state(si_->getStateSpace());
     scoped_state = config;
-    vector<double> lower = lower_;
-    vector<double> upper = upper_;
-
     int dim = si_->getStateSpace()->getDimension();
     for (int i=0; i<dim; ++i ) 
     {
-	if (scoped_state[i] <= lower[i] || scoped_state[i] >= upper[i]) 
-	{
+	if (scoped_state[i] <= lower_[i] || scoped_state[i] >= upper_[i]) 
 	    return false;
-	}
     }
     return true;
 }
@@ -186,14 +181,12 @@ bool Cell::contains(const ob::State* config) const
 {
     ob::ScopedState<> scoped_state(si_->getStateSpace());
     scoped_state = config;
-    vector<double> lower = lower_;
-    vector<double> upper = upper_;
     int dim = si_->getStateSpace()->getDimension();
     for (int i=0; i<dim; ++i ) 
     {
-	if ((scoped_state[i] > upper[i])) 
+	if ((scoped_state[i] > upper_[i])) 
 	    return false;
-	if ((scoped_state[i] < lower[i])) 
+	if ((scoped_state[i] < lower_[i])) 
 	    return false;
     }
     return true;
