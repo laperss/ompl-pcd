@@ -58,9 +58,6 @@ Cell::Cell(const vector<double>& min_vals,
 	centroid_[i] = 0.5 * (min_vals[i] + max_vals[i]);
     }
      ++num_cells;
-    if ((num_cells % 1000) == 0) {
-	cout << num_cells << " cells\n";
-    }
 }
 
 Cell::Cell(const vector<double>& min_vals, 
@@ -170,18 +167,6 @@ ob::State*  Cell::getSample(ompl::RNG &rng_)
     ob::State* state2 = si_->getStateSpace()->allocState();
     si_->copyState(state2, state.get());
     return state2;
-}
-
-bool Cell::SampleExists(const ob::State& sample) const
-{
-    const ob::State* const p_sample = &sample;
-    for (int i = samples_in_cell_.size(); i>0; i--)
-    {
-	const ob::State* const p_conf = &(*samples_in_cell_[i]);
-	if (p_conf == p_sample)
-       	    return true;
-    }
-    return false;
 }
 
 bool Cell::strictlyContains(const ob::State* config) const
