@@ -49,10 +49,7 @@ Cell::Cell(const vector<double>& min_vals,
     assert(min_vals.size() == max_vals.size());
     unsigned int i = min_vals.size();
     centroid_.resize(i);
-    int dim_ = si_->getStateSpace()->getDimension();
-    ob::State* center = si_->getStateSpace()->allocState();
-	
-    
+
     for ( ; (i)-- != 0; ) {
 	assert(min_vals[i] < max_vals[i]);
 	centroid_[i] = 0.5 * (min_vals[i] + max_vals[i]);
@@ -81,9 +78,6 @@ Cell::Cell(const vector<double>& min_vals,
     assert(!min_vals.empty());
     assert(min_vals.size() == max_vals.size());
     ++num_cells;
-    if ((num_cells % 1000) == 0) {
-	cout << num_cells << " cells\n";
-    }
     // define the center of the cell
     centroid_.resize(lower_.size());
     unsigned int i = lower_.size();
@@ -93,14 +87,14 @@ Cell::Cell(const vector<double>& min_vals,
     }
 }
 
-PCD_Graph Cell::createGraph(const ob::State*   startptr,
-			    const ob::State*   goalptr,
-			    vector<double>& min_vals,
-			    vector<double>& max_vals)
+PCD_Graph Cell::createGraph(const ob::State* start,
+			    const ob::State* goal,
+			    vector<double>&  min_vals,
+			    vector<double>&  max_vals)
 {
     Cell* const root_cell = new Cell(min_vals, max_vals);
-    root_cell->addSample(startptr, NO_CHECK);
-    root_cell->addSample(goalptr, NO_CHECK);
+    root_cell->addSample(start, NO_CHECK);
+    root_cell->addSample(goal, NO_CHECK);
     return PCD_Graph(1, root_cell);
 }
 
@@ -120,8 +114,7 @@ double Cell::cellDistance(Cell& cell1, Cell& cell2)
     vector<double> v1 = cell1.centroid_;
     vector<double> v2 = cell1.centroid_;
     double dist          = 0.0;
-    const unsigned int n = v1.size();
-    for (unsigned int i = 0; i < n; ++i) 
+    for (unsigned int i = 0; i < v1.size(); ++i) 
     {
 	dist += (v1[i]-v2[i])<0? -(v1[i]-v2[i]) : (v1[i]-v2[i]);
     }
@@ -132,12 +125,7 @@ void Cell::strip()
 {
     clear(samples_in_cell_);
     clear(neighbors_);
-    clear(centroid_);
-  
-    assert(samples_in_cell_.empty() && samples_in_cell_.capacity() == 0);
-    assert(neighbors_.empty()       && neighbors_.capacity()       == 0);
-    assert(centroid_.empty()        && centroid_.capacity()        == 0);
-  
+    clear(centroid_); 
     return;
 }
 
@@ -155,10 +143,9 @@ bool Cell::addSample(const ob::State* sample, RedundancyCheck check)
 
 ob::State*  Cell::getSample(ompl::RNG &rng_) 	
 {
-    unsigned int n = lower_.size();
     ob::ScopedState<> state(si_->getStateSpace());
-    for (int i = 0; i<n; ++i ) {
-        state[i] = lower_[i] + rng_.uniform01()* (upper_[i] - lower_[i]);
+    for (unsigned int i = 0; i < lower_.size(); ++i ) {
+        state[i] = lower_[i] + rng_.uniform01()*(upper_[i] - lower_[i]);
     }
     ob::State* state2 =  si_->cloneState(state.get());
     return state2;
@@ -168,7 +155,7 @@ bool Cell::strictlyContains(const ob::State* config) const
 {
     ob::ScopedState<> scoped_state(si_->getStateSpace());
     scoped_state = config;
-    int dim = si_->getStateSpace()->getDimension();
+    int dim = scoped_state.getSpace()->getDimension();
     for (int i=0; i<dim; ++i ) 
     {
 	if (scoped_state[i] <= lower_[i] || scoped_state[i] >= upper_[i]) 
@@ -181,7 +168,7 @@ bool Cell::contains(const ob::State* config) const
 {
     ob::ScopedState<> scoped_state(si_->getStateSpace());
     scoped_state = config;
-    int dim = si_->getStateSpace()->getDimension();
+    int dim = scoped_state.getSpace()->getDimension();
     for (int i=0; i<dim; ++i ) 
     {
 	if ((scoped_state[i] > upper_[i])) 
@@ -195,9 +182,6 @@ bool Cell::contains(const ob::State* config) const
 bool areAdjacent(const Cell& a, const Cell& b)
 {
     assert(&a != &b);
-    assert(a.lower_.size() == a.upper_.size());
-    assert(a.lower_.size() == b.lower_.size());
-    assert(a.lower_.size() == b.upper_.size());
   
     const unsigned int dim = a.lower_.size();
     unsigned int i         = dim;
@@ -261,23 +245,19 @@ void Cell::makeNeighbors(Cell& a, Cell& b)
 
 void Cell::getCommonCenter(PathSegment& a, PathSegment& b)
 {
-    const Cell& a_cell = *a.cell;
-    const Cell& b_cell = *b.cell;
-    assert(&a_cell != &b_cell);
-    assert(areAdjacent(a_cell, b_cell));
-    assert(areAdjacent(b_cell, a_cell));
+    assert(a.cell != b.cell);
+    assert(areAdjacent(*a.cell, *b.cell));
+    assert(areAdjacent(*b.cell, *a.cell));
   
-    unsigned int dim = a_cell.lower_.size();
+    unsigned int dim = a.cell->lower_.size();
     vector<double> aq;
-    vector<double> bq;
-    vector<double> ap;
     vector<double> bp;
     for (int i=0; i<dim; ++i) 
     {
-	const double a_low = a_cell.lower_[i];
-	const double a_upp = a_cell.upper_[i];
-	const double b_low = b_cell.lower_[i];
-	const double b_upp = b_cell.upper_[i];
+	const double a_low = a.cell->lower_[i];
+	const double a_upp = a.cell->upper_[i];
+	const double b_low = b.cell->lower_[i];
+	const double b_upp = b.cell->upper_[i];
 	if (overlap(a_low, a_upp, b_low, b_upp)) 
 	{
 	    aq.push_back(0.5 * (MIN(a_upp, b_upp) 
@@ -293,11 +273,11 @@ void Cell::getCommonCenter(PathSegment& a, PathSegment& b)
 	{
 	    aq.push_back(a_low);
 	    bp.push_back(a_low);
-	} else if (a_cell.isLeftBoundary(i) && b_cell.isRightBoundary(i)) 
+	} else if (a.cell->isLeftBoundary(i) && b.cell->isRightBoundary(i)) 
 	{
 	    aq.push_back(a_low);
 	    bp.push_back(b_upp);
-	} else if (b_cell.isLeftBoundary(i) && a_cell.isRightBoundary(i)) 
+	} else if (b.cell->isLeftBoundary(i) && a.cell->isRightBoundary(i)) 
 	{
 	    aq.push_back( a_upp);
 	    bp.push_back(b_low);
@@ -316,8 +296,6 @@ void Cell::getCommonCenter(PathSegment& a, PathSegment& b)
  
     a.q =  aq_state;
     b.p =  bp_state;
-    assert(a_cell.contains(a.q));
-    assert(b_cell.contains(b.p));
     return;
 }
 
