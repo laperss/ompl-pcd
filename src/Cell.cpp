@@ -49,8 +49,9 @@ Cell::Cell(const vector<double>& min_vals,
     assert(min_vals.size() == max_vals.size());
     unsigned int i = min_vals.size();
     centroid_.resize(i);
-
+    range_.resize(i);
     for ( ; (i)-- != 0; ) {
+	range_[i] = max_vals[i]-min_vals[i];
 	assert(min_vals[i] < max_vals[i]);
 	centroid_[i] = 0.5 * (min_vals[i] + max_vals[i]);
     }
@@ -78,10 +79,12 @@ Cell::Cell(const vector<double>& min_vals,
     assert(!min_vals.empty());
     assert(min_vals.size() == max_vals.size());
     ++num_cells;
-    // define the center of the cell
-    centroid_.resize(lower_.size());
+
     unsigned int i = lower_.size();
+    centroid_.resize(i);
+    range_.resize(i);
     for ( ; (i)-- != 0; ) {
+	range_[i] = max_vals[i]-min_vals[i];
 	centroid_[i] = 0.5 * (lower_[i] + upper_[i]);
 	assert(lower_[i] <= upper_[i]);
     }
@@ -155,6 +158,7 @@ bool Cell::strictlyContains(const ob::State* config) const
 {
     ob::ScopedState<> scoped_state(si_->getStateSpace());
     scoped_state = config;
+    
     int dim = scoped_state.getSpace()->getDimension();
     for (int i=0; i<dim; ++i ) 
     {
@@ -283,7 +287,6 @@ void Cell::getCommonCenter(PathSegment& a, PathSegment& b)
 	    bp.push_back(b_low);
 	} 
     }
-
     ob::ScopedState<> aq_ss(si_->getStateSpace());
     ob::ScopedState<> bp_ss(si_->getStateSpace());
     for (int i = 0; i<dim; ++i) 

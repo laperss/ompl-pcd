@@ -38,6 +38,7 @@ public:
     vector<const ob::State*> samples_in_cell_;
     vector<double>           lower_;
     vector<double>           upper_;
+    vector<double>           range_;
     vector<double>           centroid_;
     vector<Cell*>            neighbors_;
     Cell*                    parent_;
@@ -77,7 +78,6 @@ public:
     bool isRightBoundary(unsigned int i) const;
     bool isLeftAndRightBoundary(unsigned int i) const;
     CellType getType() const;
-    double getVolume() const;
     Cell_ID getID() const;  
     void strip();
     void removeLeftBoundary(unsigned int i);

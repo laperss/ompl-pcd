@@ -315,17 +315,12 @@ Cell& og::PCD::getNonMixedCell(Cell& cell, const ob::State* state)
 		leaf->up_child_->strictlyContains(state)) || 
 	       (leaf->up_child_->contains(state) ^ 
 		leaf->lo_child_->strictlyContains(state))); 
-
 	leaf = leaf->lo_child_->contains(state) ? 
 	    leaf->lo_child_ : 
 	    leaf->up_child_; 
     }
     return *leaf;
 }
-
-
-
-
 
 // ======================= CHECK PATH FUNCTIONS ===============================
 
@@ -627,8 +622,8 @@ bool og::PCD::findSplitDirection(const ob::State*    state1,
 	    if (valid_directions[i]) 
 	    {
 		// min value
-		const double epsilon = (((1.0e-8) > ( (cell.upper_[i] - cell.lower_[i]) / 1e3))? 
-					( (cell.upper_[i] - cell.lower_[i]) / 1e3) : 
+		const double epsilon = (((1.0e-8) > ( (cell.range_[i]) / 1e3))? 
+					( (cell.range_[i]) / 1e3) : 
 					(1.0e-8));
 		double 	diff = distance(state1, state2, i) ;
 		if (diff > epsilon) 
