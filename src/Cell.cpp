@@ -57,6 +57,7 @@ Cell::Cell(const vector<double>& min_vals,
 	assert(min_vals[i] < max_vals[i]);
 	centroid_[i] = 0.5 * (min_vals[i] + max_vals[i]);
     }
+
      ++num_cells;
 }
 
@@ -91,33 +92,16 @@ Cell::Cell(const vector<double>& min_vals,
 	assert(lower_[i] <= upper_[i]);
     }
 }
-Cell::Cell(const ob::SpaceInformationPtr& si):
-    //si_(si),
-    centroid_(),
-    region_type_(REG_UNSPEC),
-    neighbors_(),
-    lo_child_(0),
-    up_child_(0),
-    parent_(0),
-    visited_(0),
-    closed_(0),
-    init_dist_(INFINITY),
-    previous_node_(0),
-    goal_dist_(-1.0),
-    left_boundary_(UINT64_C(0)),
-    right_boundary_(UINT64_C(0)),
-    id_(next_cell_id++){};
 
 PCD_Graph Cell::createGraph(const ob::State*   startptr,
 			    const ob::State*   goalptr,
 			    vector<double>& min_vals,
 			    vector<double>& max_vals)
 {
-  Cell* const root_cell = new Cell(min_vals, max_vals);
-  
-  root_cell->addSample(startptr, NO_CHECK);
-  root_cell->addSample(goalptr, NO_CHECK);
-  return PCD_Graph(1, root_cell);
+    Cell* const root_cell = new Cell(min_vals, max_vals);
+    root_cell->addSample(startptr, NO_CHECK);
+    root_cell->addSample(goalptr, NO_CHECK);
+    return PCD_Graph(1, root_cell);
 }
 
 void Cell::destroyGraph(PCD_Graph& graph)
@@ -151,8 +135,7 @@ bool Cell::addSample(const ob::State* sample, RedundancyCheck check)
 {
   ++num_samples;
   // copy and add state
-  ob::State* p_sample =   si_->getStateSpace()->allocState();
-  si_->getStateSpace()->copyState(p_sample,sample);
+  ob::State* p_sample =   si_->getStateSpace()->cloneState(sample);
   samples_in_cell_.push_back(p_sample);
   return p_sample != 0;
 }
