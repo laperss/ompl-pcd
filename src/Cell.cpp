@@ -147,8 +147,7 @@ ob::State*  Cell::getSample(ompl::RNG &rng_)
     for (int i = 0; i<n; ++i ) {
         state[i] = lower_[i] + rng_.uniform01()* (upper_[i] - lower_[i]);
     }
-    ob::State* state2 = si_->getStateSpace()->allocState();
-    si_->copyState(state2, state.get());
+    ob::State* state2 =  si_->cloneState(state.get());
     return state2;
 }
 
@@ -306,12 +305,9 @@ void Cell::getCommonCenter(PathSegment& a, PathSegment& b)
 	aq_ss[i] = aq[i];
 	bp_ss[i] = bp[i];
     }
-    ob::State* aq_state = si_->getStateSpace()->allocState();
-    ob::State* bp_state = si_->getStateSpace()->allocState();
-    si_->copyState(aq_state, aq_ss.get());
-    si_->copyState(bp_state, bp_ss.get());
-    //a.q =  aq_ss.get();
-    //b.p =  bp_ss.get();
+    ob::State* aq_state = si_->cloneState(aq_ss.get());
+    ob::State* bp_state = si_->cloneState(bp_ss.get());
+ 
     a.q =  aq_state;
     b.p =  bp_state;
     assert(a_cell.contains(a.q));
