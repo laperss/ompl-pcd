@@ -16,8 +16,6 @@ namespace ompl
 {
     namespace geometric
     {
-	// FORWARD DECLARATION
-	// split advisor is not used at this point
 	class PCD: public ob::Planner
 	{
 	public:	
@@ -74,7 +72,6 @@ namespace ompl
 				    unsigned int&         split_coord_indx) const;
 
 	    bool   isSatisfied(const ob::State* state);
-	    double cellDistance(Cell& cell1, Cell& cell2);
 	    double distance(vector<double> v1, vector<double> v2);
 	    double distance(const ob::State* s1, const ob::State* s2, int i) const;
 

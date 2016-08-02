@@ -115,6 +115,19 @@ void Cell::destroyGraph(PCD_Graph& graph)
     assert(graph.empty() && graph.capacity() == 0);
 }
 
+double Cell::cellDistance(Cell& cell1, Cell& cell2)
+{
+    vector<double> v1 = cell1.centroid_;
+    vector<double> v2 = cell1.centroid_;
+    double dist          = 0.0;
+    const unsigned int n = v1.size();
+    for (unsigned int i = 0; i < n; ++i) 
+    {
+	dist += (v1[i]-v2[i])<0? -(v1[i]-v2[i]) : (v1[i]-v2[i]);
+    }
+    return dist;
+}
+
 void Cell::strip()
 {
     clear(samples_in_cell_);

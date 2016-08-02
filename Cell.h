@@ -93,6 +93,7 @@ public:
 				 const ob::State*   goal,
 				 vector<double>&    min_vals,
 				 vector<double>&    max_vals);
+    static double cellDistance(Cell& cell1, Cell& cell2);
     static void destroyGraph(PCD_Graph& graph);
     static void makeNeighbors(Cell& a, Cell& b);
     static bool isFreeBridgeCell(const Cell& cell);

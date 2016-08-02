@@ -126,31 +126,37 @@ ob::PlannerStatus og::PCD::solve(const ob::PlannerTerminationCondition &ptc)
     CellPath cell_path;
     bool success            = false;
     bool approximate        = false;
+    bool found_path         = false;
     unsigned int num_iter   = 0;
     start_ptr =   pis_.nextStart();  
     goal_ptr  =   pis_.nextGoal();
     assert(isSatisfied(start_ptr));
     assert(isSatisfied(goal_ptr));
+    cout <<"* start solve\n";
     pcd_graph_ = Cell::createGraph(start_ptr,goal_ptr,spaceBounds_.min,spaceBounds_.max);
- 
+    cout <<"* start solve\n";
+    int type_it;
+
     checkValidity();
     while ((num_iter < max_num_iter_) && !success) 
     {
+	ompl::time::point start_time = ompl::time::now(); 	
 	++num_iter;
 	cout << "\n* find cell path\n";
 	found_path = (findCellPath(cell_path)); 
 	if (found_path)
 	{
+	    type_it = 1;
 	    cout << "* get cell path\n";
 	    Cell::getPath(cell_path);
-	    cout << "* found possible path: (";
-	    for(int i=0; i<cell_path.size();++i)
-	    {
-		if (i != cell_path.size()-1)
-		    cout << cell_path[i].cell->getID()<< ", ";
-		else
-		    cout << cell_path[i].cell->getID()<< ")\n";
-	    }
+	    cout << "* found possible path: \n";
+	    // for(int i=0; i<cell_path.size();++i)
+	    // {
+	    // 	if (i != cell_path.size()-1)
+	    // 	    cout << cell_path[i].cell->getID()<< ", ";
+	    // 	else
+	    // 	    cout << cell_path[i].cell->getID()<< ")\n";
+	    // }
 	    if (checkPath(cell_path)) 
 	    {
 		success = true;
@@ -214,7 +220,7 @@ bool og::PCD::findCellPath(CellPath& cell_path)
     // initiate A* search:
     Cell* current_node     = &start_cell;
     current_node->init_dist_   = 0.0;
-    current_node->goal_dist_ = cellDistance(start_cell, goal_cell);
+    current_node->goal_dist_ = Cell::cellDistance(start_cell, goal_cell);
     current_node->previous_node_ = 0;	
     current_node->visited_ = astar_timer_;
     open_cells.push(current_node);
@@ -239,7 +245,7 @@ bool og::PCD::findCellPath(CellPath& cell_path)
 	    if ((neighbor.type_ == Cell::POSS_FREE) && (neighbor.closed_ != astar_timer_)) 
 	    {
 		const double path_dist = current_node->init_dist_ + 
-		    cellDistance(*current_node, neighbor); 
+		    Cell::cellDistance(*current_node, neighbor); 
 		if (neighbor.visited_ != astar_timer_ || path_dist < neighbor.init_dist_) 
 		{
 		    new_cells.push_front(&neighbor);
@@ -247,7 +253,7 @@ bool og::PCD::findCellPath(CellPath& cell_path)
 		    neighbor.previous_node_ = current_node;
 		    if (neighbor.visited_  != astar_timer_) 
 		    {
-			neighbor.goal_dist_ = cellDistance(neighbor, goal_cell);;
+			neighbor.goal_dist_ = Cell::cellDistance(neighbor, goal_cell);;
 		    }
 		}
 	    }
@@ -275,14 +281,6 @@ bool og::PCD::findCellPath(CellPath& cell_path)
 	}
     }
     return false;
-}
-
-double og::PCD::cellDistance(Cell& cell1, Cell& cell2)
-{
-    vector<double> c1 = cell1.centroid_;
-    vector<double> c2 = cell2.centroid_;
-    double dist = distance(c1, c2);
-    return dist;
 }
 
 double og::PCD::distance(vector<double> v1, vector<double> v2)
@@ -424,7 +422,7 @@ bool og::PCD::isSegmentOK(const ob::State* from,
     while (!intervals.empty()) 
     {
 	intervals.pop_front();
-	if (si_->distance (conf_low, conf_high) >= max_step_size_)
+	if (si_->distance(conf_low, conf_high) >= max_step_size_)
 	{
 	    const double t_mid = 0.5 * (t_low + t_high);
 	    si_->getStateSpace()->interpolate(from,to,t_mid,conf_high);   
@@ -492,6 +490,7 @@ void  og::PCD::splitCell(Cell&              cell,
 	
         // find the sample in the cell closest to config
         const ob::State* nearest  =  findNearestSample(state, split_cell->samples_in_cell_); 
+	
         unsigned int split_dir = 0;
 
         findSplitDirection(state, nearest, valid_directions, *split_cell, split_dir);
@@ -543,7 +542,7 @@ void  og::PCD::splitCell(Cell&              cell,
 	}
 
 	vector<const ob::State*>::iterator iter        = split_cell->samples_in_cell_.begin();
-	const vector<const ob::State*>::iterator itend =       split_cell->samples_in_cell_.end();
+	const vector<const ob::State*>::iterator itend = split_cell->samples_in_cell_.end();
 	while (iter != itend) {
 	    assert(split_cell->contains(*iter));
 	    assert((lo_child->contains(*iter) ^ up_child->strictlyContains(*iter)) ||
@@ -680,7 +679,7 @@ const ob::State* og::PCD::findNearestSample(const ob::State*  state,
     for ( ; (i)-- != 0; ) 
     {
 	const ob::State* test_config = samples[i];
-	double 	diff = si_->distance ( test_config, state) ;
+	double 	diff = si_->distance( test_config, state) ;
 	if (diff < min_dist) 
 	{
 	    min_dist = diff;
@@ -712,8 +711,7 @@ void og::PCD::sampleOccCells()
 	    obstCells.push_back(&cell);
 	}
 
-	// when sampling, the previous A*-search was unsuccessful and 
-	// therefore the complete start region is closed
+	// All cells directly connected to start are in reg_start
 	cell.region_type_ = cell.closed_ == astar_timer_ ?
 	    Cell::REG_START        :
 	    Cell::REG_UNSPEC;
@@ -728,6 +726,7 @@ void og::PCD::sampleOccCells()
     deque<Cell*> tempCells;
     tempCells.push_back(currCell);
   
+    // make all cells directly connected with the goal cell to goal regions.
     while (!tempCells.empty()) 
     {
 	currCell = tempCells.front();
@@ -746,6 +745,8 @@ void og::PCD::sampleOccCells()
 	}
     }
 
+
+    // find bridge cell to connect start region with goal region. 
     vector<Cell*> bridgeCells;
     bridgeCells.reserve(obstCells.size());
     vector<Cell*>::iterator cellIt   = obstCells.begin();
@@ -767,7 +768,6 @@ void og::PCD::sampleOccCells()
     }
     random_shuffle(bridgeCells.begin(), bridgeCells.end());
 
-    //  use bridge-cell sampling or not?
     const unsigned int numObstCells      = obstCells.size();
     const unsigned int numBridgeCells    = bridgeCells.size();
     const unsigned int max_bridge_trials = (rng_.uniform01() < 0.8)? 10 : 0; // 30
@@ -777,23 +777,28 @@ void og::PCD::sampleOccCells()
     unsigned int num_trials     = 0;
     bool obst_cell_found        = true;
 
+    cout << "NumBridgeCells: " <<numBridgeCells;
     // sample until a free bridge cell connects the start and goal regions
     while (num_new_cells == 0 && num_trials < max_bridge_trials && obst_cell_found) 
     {
 	obst_cell_found = false;
 	++num_trials;
-
+	
 	for (i = 0; i < numBridgeCells && num_new_cells <= max_new_free_cells_; ++i) 
 	{
 	    Cell& cell = *bridgeCells[i];
-
 	    if ((cell.getType() == Cell::POSS_FULL) &&
 		(distance(cell.lower_, cell.upper_) > 1.0e-14)) 
 	    {
+		cout << "\n";
+		cell.print(cout);
 		obst_cell_found = true;
 		state = cell.getSample(rng_); 
+		si_->printState(state);
+		cout << "satisfied: " << isSatisfied(state) << "\n";
 		if (isSatisfied(state)) 
 		{
+		    cout << " *\n";
 		    splitCell(cell, state, split_directions_, pcd_graph_);
 		    ++num_new_cells;
 		    return;
@@ -804,9 +809,13 @@ void og::PCD::sampleOccCells()
 	    }
 	}
     }
+
+    cout << "\nNumObstCells: " <<numObstCells ;
+    // if bridge cells failed??
     obst_cell_found = true;
     while (num_new_cells == 0 && obst_cell_found) 
     {
+	cout << " *";
     	obst_cell_found = false;
 	
     	for (i = 0; i < numObstCells && num_new_cells < max_new_free_cells_; ++i) 
@@ -828,6 +837,7 @@ void og::PCD::sampleOccCells()
     	    }
     	}
     }
+    cout << "\n";
     return;
 }
 
