@@ -56,11 +56,8 @@ public:
     static unsigned int      num_samples;
     
     
-    // TEST
     static ob::SpaceInformationPtr si_;
-    //static const PCD* pcd_;
     static void setSI(const ob::SpaceInformationPtr&);
-    //static void setPCD(const PCD*);
 
     // Constructor 
     Cell(const ompl::base::SpaceInformationPtr& si);
@@ -82,7 +79,6 @@ public:
     CellType getType() const;
     double getVolume() const;
     Cell_ID getID() const;  
-    //void getSample(ob::State* sample) const;
     void strip();
     void removeLeftBoundary(unsigned int i);
     void removeRightBoundary(unsigned int i);
@@ -106,23 +102,16 @@ public:
 		   vector<bool>       valid_directions,
 		   PCD_Graph&         cell_graph);
 private:
-
-    // data
     BoundaryFlagT         left_boundary_;
     BoundaryFlagT         right_boundary_;
-    // static data
+
     static unsigned int   num_cells;
     static unsigned int   next_cell_id;
     unsigned int          id_;
 
-    // functions
     Cell(const vector<double>& min_vals,
 	 const vector<double>& max_vals);
-    //~Cell();
-
 };
-
-
 
 
 struct cellGreater {bool operator()(const Cell* p, const Cell* q) const;};
