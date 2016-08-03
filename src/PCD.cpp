@@ -1,3 +1,4 @@
+#define NDEBUG 
 #include "../PCD.h"
 #include "../Cell.h"
 
@@ -9,25 +10,6 @@
 #define DEF_MAX_NUM_ITER 100000
 
 // ======================== CONSTRUCTORS ============================
-og::PCD::PCD(const ob::SpaceInformationPtr &si, vector<Cell*>& cell_division) : 
-    ob::Planner(si, "PCD"),
-    astar_timer_(0),
-    pcd_graph_(0),
-    max_num_iter_(DEF_MAX_NUM_ITER),
-
-    max_new_free_cells_(DEF_MAX_NEW_FREE_CELLS),
-    max_step_size_(1.0 *3.14/180),
-    cell_division_(cell_division)
-{
-    Cell::setSI(si);
-    // Planner specs
-    Planner::specs_.multithreaded = false;
-    Planner::specs_.approximateSolutions = false;
-    Planner::specs_.optimizingPaths = false;
-    Planner::specs_.directed = false;
-    Planner::specs_.provingSolutionNonExistence = false;
-}
-
     og::PCD::PCD(const ob::SpaceInformationPtr &si) : 
 	ob::Planner(si, "PCD"),
 	astar_timer_(0),
@@ -109,6 +91,7 @@ void og::PCD::clear()
 {
     Planner::clear();
     sampler_.reset();
+    collision_checks_ = 0;
 }
 
 void og::PCD::getPlannerData(ob::PlannerData &data) const
@@ -132,9 +115,7 @@ ob::PlannerStatus og::PCD::solve(const ob::PlannerTerminationCondition &ptc)
     goal_ptr  =   pis_.nextGoal();
     assert(isSatisfied(start_ptr));
     assert(isSatisfied(goal_ptr));
-    cout <<"* start solve\n";
     pcd_graph_ = Cell::createGraph(start_ptr,goal_ptr,spaceBounds_.min,spaceBounds_.max);
-    cout <<"* start solve\n";
     int type_it;
 
     checkValidity();
@@ -142,21 +123,11 @@ ob::PlannerStatus og::PCD::solve(const ob::PlannerTerminationCondition &ptc)
     {
 	ompl::time::point start_time = ompl::time::now(); 	
 	++num_iter;
-	cout << "\n* find cell path\n";
 	found_path = (findCellPath(cell_path)); 
 	if (found_path)
 	{
 	    type_it = 1;
-	    cout << "* get cell path\n";
 	    Cell::getPath(cell_path);
-	    cout << "* found possible path: \n";
-	    // for(int i=0; i<cell_path.size();++i)
-	    // {
-	    // 	if (i != cell_path.size()-1)
-	    // 	    cout << cell_path[i].cell->getID()<< ", ";
-	    // 	else
-	    // 	    cout << cell_path[i].cell->getID()<< ")\n";
-	    // }
 	    if (checkPath(cell_path)) 
 	    {
 		success = true;
@@ -166,26 +137,25 @@ ob::PlannerStatus og::PCD::solve(const ob::PlannerTerminationCondition &ptc)
 	    if (pcd_graph_.size() >= next_free_cells_sampling) 
 	    {
 		next_free_cells_sampling += free_cells_sample_period;
-		cout << "* sample free cell\n";
 		sampleFreeCells();
 	    } else		
 	    {
-		cout << "* sample occupied cell\n";
 		sampleOccCells();		
 	    }	
 	}
     }
     if (success == true)
     {
-	og::PathGeometric *path = new og::PathGeometric(si_);
-	path->append(cell_path[0].p);
-	for (int i= 0 ; i <  cell_path.size(); ++i)
-	{
-	    path->append(cell_path[i].q);
-	}
-	pdef_->addSolutionPath(ob::PathPtr(path));
+    	og::PathGeometric *path = new og::PathGeometric(si_);
+    	path->append(cell_path[0].p);
+    	for (int i= 0 ; i <  cell_path.size(); ++i)
+    	{
+    	    path->append(cell_path[i].q);
+    	}
+    	pdef_->addSolutionPath(ob::PathPtr(path));
     }
     getAllCells(cell_division_, pcd_graph_.front());
+    cout << "Collision checks: " << collision_checks_ <<"\n";
     return ob::PlannerStatus(success , approximate);
 }
 
@@ -488,7 +458,7 @@ void  og::PCD::splitCell(Cell&              cell,
 	
         unsigned int split_dir = 0;
 
-        findSplitDirection(state, nearest, valid_directions, *split_cell, split_dir);
+        findSplitDirection(state, nearest, valid_directions, split_cell, split_dir);
 	double split_t = 0.5;
 
 	// find state to divide, can this be done in a nicer way?
@@ -607,7 +577,7 @@ void  og::PCD::splitCell(Cell&              cell,
 bool og::PCD::findSplitDirection(const ob::State*    state1,
 				 const ob::State*    state2,
 				 vector<bool>&       valid_directions,
-				 const Cell&         cell,
+				 const Cell*         cell,
 				 unsigned int&       split_coord_indx) const
 {
     int  dim = si_->getStateDimension();
@@ -622,14 +592,15 @@ bool og::PCD::findSplitDirection(const ob::State*    state1,
 	    if (valid_directions[i]) 
 	    {
 		// min value
-		const double epsilon = (((1.0e-8) > ( (cell.range_[i]) / 1e3))? 
-					( (cell.range_[i]) / 1e3) : 
+		const double epsilon = (((1.0e-8) > ( (cell->range_[i]) / 1e3))? 
+					( (cell->range_[i]) / 1e3) : 
 					(1.0e-8));
 		double 	diff = distance(state1, state2, i) ;
 		if (diff > epsilon) 
 		{
 		    // normalize with the range of this DOF
    		    diff /= ( spaceBounds_.max[i] - spaceBounds_.min[i]);
+		    // split in direciton with largest diff
    		    if (diff > max_diff) {
    			max_diff         = diff;
    			split_coord_indx = i;
@@ -663,7 +634,6 @@ void og::PCD::getAllCells(vector<Cell*>& cells, Cell* node)
 }
 
 // ============================= SAMPLE FUNCITONS ====================================
-
 const ob::State* og::PCD::findNearestSample(const ob::State*  state,
 					    const vector<const ob::State*> samples)
 {
@@ -686,8 +656,8 @@ const ob::State* og::PCD::findNearestSample(const ob::State*  state,
 
 bool og::PCD::isSatisfied(const ob::State* state)	
 {
-    const bool satisfied = si_->isValid(state); 
-    return satisfied;
+    ++collision_checks_;
+    return si_->isValid(state); 
 }
 
 void og::PCD::sampleOccCells()
@@ -772,8 +742,6 @@ void og::PCD::sampleOccCells()
     unsigned int num_trials     = 0;
     bool obst_cell_found        = true;
 
-    cout << "NumBridgeCells: " <<numBridgeCells;
-    // sample until a free bridge cell connects the start and goal regions
     while (num_new_cells == 0 && num_trials < max_bridge_trials && obst_cell_found) 
     {
 	obst_cell_found = false;
@@ -785,15 +753,10 @@ void og::PCD::sampleOccCells()
 	    if ((cell.getType() == Cell::POSS_FULL) &&
 		(distance(cell.lower_, cell.upper_) > 1.0e-14)) 
 	    {
-		cout << "\n";
-		cell.print(cout);
 		obst_cell_found = true;
 		state = cell.getSample(rng_); 
-		si_->printState(state);
-		cout << "satisfied: " << isSatisfied(state) << "\n";
 		if (isSatisfied(state)) 
 		{
-		    cout << " *\n";
 		    splitCell(cell, state, split_directions_, pcd_graph_);
 		    ++num_new_cells;
 		    return;
@@ -805,12 +768,9 @@ void og::PCD::sampleOccCells()
 	}
     }
 
-    cout << "\nNumObstCells: " <<numObstCells ;
-    // if bridge cells failed??
     obst_cell_found = true;
     while (num_new_cells == 0 && obst_cell_found) 
     {
-	cout << " *";
     	obst_cell_found = false;
 	
     	for (i = 0; i < numObstCells && num_new_cells < max_new_free_cells_; ++i) 
@@ -832,7 +792,6 @@ void og::PCD::sampleOccCells()
     	    }
     	}
     }
-    cout << "\n";
     return;
 }
 

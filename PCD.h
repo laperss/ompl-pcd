@@ -19,7 +19,6 @@ namespace ompl
 	class PCD: public ob::Planner
 	{
 	public:	
-	    PCD(const ob::SpaceInformationPtr &si, vector<Cell*>& cell_division);
 	    PCD(const ob::SpaceInformationPtr &si);
 	    void splitCell(Cell& cell);
 	    virtual ~PCD();
@@ -52,7 +51,6 @@ namespace ompl
 	    bool isSegmentOK(const ob::State*   from,
 			     const ob::State*   to,
 			     Cell&              cell);
-
 	    void  sampleOccCells();
 	    void  sampleOccCell(Cell& occ_cell, unsigned int max_num_tries = 10);
 	    Cell& getNonMixedCell(Cell& cell, const ob::State* state);
@@ -68,7 +66,7 @@ namespace ompl
 	    bool findSplitDirection(const ob::State*      conf1,
 				    const ob::State*      conf2,
 				    std::vector<bool>&    valid_directions,
-				    const Cell&           cell,
+				    const Cell*           cell,
 				    unsigned int&         split_coord_indx) const;
 
 	    bool   isSatisfied(const ob::State* state);
@@ -76,9 +74,9 @@ namespace ompl
 	    double distance(const ob::State* s1, const ob::State* s2, int i) const;
 
 	protected:
+	    int                           collision_checks_;
 	    RNG                           rng_;
 	    ob::StateSamplerPtr           sampler_;
-
 	    PCD_Graph                     pcd_graph_; // structure containing all (current?) cells
 	    unsigned int                  astar_timer_;    
 	    int                           max_num_it;
