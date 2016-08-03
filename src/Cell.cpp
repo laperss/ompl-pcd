@@ -112,10 +112,10 @@ void Cell::destroyGraph(PCD_Graph& graph)
     assert(graph.empty() && graph.capacity() == 0);
 }
 
-double Cell::cellDistance(Cell& cell1, Cell& cell2)
+double Cell::cellDistance(Cell* cell1, Cell* cell2)
 {
-    vector<double> v1 = cell1.centroid_;
-    vector<double> v2 = cell1.centroid_;
+    vector<double> v1 = cell1->centroid_;
+    vector<double> v2 = cell1->centroid_;
     double dist          = 0.0;
     for (unsigned int i = 0; i < v1.size(); ++i) 
     {
@@ -158,7 +158,6 @@ bool Cell::strictlyContains(const ob::State* config) const
 {
     ob::ScopedState<> scoped_state(si_->getStateSpace());
     scoped_state = config;
-    
     int dim = scoped_state.getSpace()->getDimension();
     for (int i=0; i<dim; ++i ) 
     {
@@ -338,18 +337,19 @@ void Cell::print(ostream& os) const
   if (region_type_ == REG_UNSPEC) {
     os << " unspecified\n";
   } else if (region_type_ == REG_START) {
-    os << " start region\n";
+    os << " start_region\n";
   } else if (region_type_ == REG_GOAL) {
-    os << " goal region\n";
+    os << " goal_region\n";
   } else {
-    os << region_type_ << ", BUG! (invalid region type)\n";
+    os << region_type_ << "invalid region type\n";
   }
   
-  os << "num neighbors: "    << neighbors_.size()       << "\n"
-     << "num samples:   "    << samples_in_cell_.size() << "\n";
-  os << "neigbors: (";
-  for(int i=0; i<neighbors_.size();++i)
-      os << neighbors_[i]->getID() << " ";
+  os << "num_neighbors: "    << neighbors_.size()       << "\n"
+     << "num_samples:   "    << samples_in_cell_.size() << "\n";
+  // os << "neigbors: (";
+  // for(int i=0; i<neighbors_.size();++i)
+  //     os << neighbors_[i]->getID() << " ";
 
-  os << ")\n------------------\n";
+  // os << ")";
+  // os << "\n";
 }

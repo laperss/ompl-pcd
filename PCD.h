@@ -20,7 +20,7 @@ namespace ompl
 	{
 	public:	
 	    PCD(const ob::SpaceInformationPtr &si);
-	    void splitCell(Cell& cell);
+	    //void splitCell(Cell& cell);
 	    virtual ~PCD();
 	    virtual void setProblemDefinition(const ob::ProblemDefinitionPtr &pdef);
 	    virtual      ob::PlannerStatus solve(const ob::PlannerTerminationCondition &ptc);
@@ -29,6 +29,8 @@ namespace ompl
 	    virtual void getPlannerData(ob::PlannerData &data) const;
 	    void freeMemory();
 	    void sample_path();
+	    int    nChecks();
+
 
 	    const ob::State* findNearestSample(const ob::State*                     state,
 					       const std::vector<const ob::State*>  samples);
@@ -44,21 +46,22 @@ namespace ompl
 	    double                         max_step_size_;
 	    unsigned int                   max_new_free_cells_;
 	    unsigned int                   max_num_iter_;
+	    int                            collision_checks_;
 
 	    bool checkPath(CellPath& cell_path);
 	    bool parallelCheck(CellPath& cell_path);
 	    bool serialCheck(CellPath& cell_path);
 	    bool isSegmentOK(const ob::State*   from,
 			     const ob::State*   to,
-			     Cell&              cell);
+			     Cell*              cell);
 	    void  sampleOccCells();
-	    void  sampleOccCell(Cell& occ_cell, unsigned int max_num_tries = 10);
-	    Cell& getNonMixedCell(Cell& cell, const ob::State* state);
+	    void  sampleOccCell(Cell* occ_cell, unsigned int max_num_tries = 10);
+	    Cell* getNonMixedCell(Cell* cell, const ob::State* state);
 	    void  sampleFreeCells();
 	    void  getSpaceLimits(ob::StateSpacePtr stateSpace, SpaceBounds& bounds);
 
 	    void  getAllCells(vector<Cell*>& cells, Cell* node);
-	    void  splitCell(Cell&             cell,
+	    void  splitCell(Cell*             cell,
 			    const ob::State*  config,
 			    std::vector<bool> valid_directions,
 			    PCD_Graph&        cell_graph);
@@ -74,7 +77,6 @@ namespace ompl
 	    double distance(const ob::State* s1, const ob::State* s2, int i) const;
 
 	protected:
-	    int                           collision_checks_;
 	    RNG                           rng_;
 	    ob::StateSamplerPtr           sampler_;
 	    PCD_Graph                     pcd_graph_; // structure containing all (current?) cells
