@@ -119,7 +119,7 @@ ob::PlannerStatus og::PCD::solve(const ob::PlannerTerminationCondition &ptc)
     int type_it;
 
     checkValidity();
-    while ((num_iter < max_num_iter_) && !success) 
+    while (ptc == false && !success) 
     {
 	ompl::time::point start_time = ompl::time::now(); 	
 	++num_iter;
