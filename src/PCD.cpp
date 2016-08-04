@@ -300,8 +300,8 @@ int og::PCD::nChecks()
 
 bool og::PCD::checkPath(CellPath& cell_path)
 {
-    if (!parallelCheck(cell_path)) 
-    	return false;
+    // if (!parallelCheck(cell_path)) 
+    // 	return false;
     const unsigned int n = cell_path.size();
 
     for (unsigned int i = 1; i < n; ++i)  
@@ -320,7 +320,7 @@ bool og::PCD::checkPath(CellPath& cell_path)
 
 bool og::PCD::parallelCheck(CellPath& cell_path)
 {
-    static const double keys[] = {0.5, 0.25, 0.75, 0.125, 0.375, 0.625, 0.875, 0.0625};   
+    static const double keys[] = {0.5, 0.25, 0.75, 0.125, 0.375, 0.625, 0.875};   
     const unsigned int NUM_CHECKS = (sizeof(keys) / sizeof((keys)[0]));
     const unsigned int n          = cell_path.size();
 
@@ -367,10 +367,12 @@ bool og::PCD::isSegmentOK(const ob::State* from,
 {
     assert(isSatisfied(from));
     assert(isSatisfied(to));
+
+    // cell is here to enable split or add sample?
     assert(cell->contains(from));
     assert(cell->contains(to));
   
-    const unsigned int max_samples_to_add = 0; // why?
+    const unsigned int max_samples_to_add = 10; // why?
     unsigned int num_samples_added        = 0;
   
     deque<pair<double, double> > intervals;
@@ -395,11 +397,10 @@ bool og::PCD::isSegmentOK(const ob::State* from,
 		splitCell(cell, state_high, split_directions_, pcd_graph_);
 		sampleOccCell(getNonMixedCell(cell, state_high), 100);
 		return false;
-	    } else if (num_samples_added < max_samples_to_add) 
+	    } else //if (num_samples_added < max_samples_to_add) 
 	    {
 		cell->addSample(state_high);
 		++num_samples_added;
-		cout << "numsamples: " << num_samples_added << "\n"; // always adds 10!!
 	    }
 	    intervals.push_back(make_pair(t_low, t_mid));
 	    intervals.push_back(make_pair(t_mid, t_high));
@@ -710,9 +711,9 @@ void og::PCD::sampleOccCells()
     }
 
 
-    // find bridge cell to connect start region with goal region. 
-    vector<Cell*> bridgeCells;
-    bridgeCells.reserve(obstCells.size());
+    // find interesting cell to connect start region with goal region. 
+    vector<Cell*> interestingCells;
+    interestingCells.reserve(obstCells.size());
     vector<Cell*>::iterator cellIt   = obstCells.begin();
     vector<Cell*>::iterator cellsEnd = obstCells.end();
     while (cellIt != cellsEnd) 
@@ -724,31 +725,31 @@ void og::PCD::sampleOccCells()
 	    prod *= (*cellIt)->neighbors_[i]->region_type_;
 	    if (prod % Cell::BRIDGE_FACTOR == 0) 
 	    {
-		bridgeCells.push_back(*cellIt);
+		interestingCells.push_back(*cellIt);
 		break;
 	    }
 	}
 	++cellIt;
     }
-    random_shuffle(bridgeCells.begin(), bridgeCells.end());
+    random_shuffle(interestingCells.begin(), interestingCells.end());
 
     const unsigned int numObstCells      = obstCells.size();
-    const unsigned int numBridgeCells    = bridgeCells.size();
-    const unsigned int max_bridge_trials = (rng_.uniform01() < 0.8)? 10 : 0; // 30
+    const unsigned int numInterestingCells    = interestingCells.size();
+    const unsigned int max_interesting_trials = (rng_.uniform01() < 0.8)? 10 : 0; // 30
 
     ob::State* state;
     unsigned int num_new_cells  = 0;
     unsigned int num_trials     = 0;
     bool obst_cell_found        = true;
 
-    while (num_new_cells == 0 && num_trials < max_bridge_trials && obst_cell_found) 
+    while (num_new_cells == 0 && num_trials < max_interesting_trials && obst_cell_found) 
     {
 	obst_cell_found = false;
 	++num_trials;
 	
-	for (i = 0; i < numBridgeCells && num_new_cells <= max_new_free_cells_; ++i) 
+	for (i = 0; i < numInterestingCells && num_new_cells <= max_new_free_cells_; ++i) 
 	{
-	    Cell* cell = bridgeCells[i];
+	    Cell* cell = interestingCells[i];
 	    if ((cell->getType() == Cell::POSS_FULL) &&
 		(distance(cell->lower_, cell->upper_) > 1.0e-14)) 
 	    {
