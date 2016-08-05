@@ -19,9 +19,9 @@ typedef std::vector<Cell*> PCD_Graph;
 
 struct PathSegment {
 PathSegment(Cell& c): cell(&c) {}
-Cell* cell;
-const ob::State* p;
-const ob::State* q;
+    Cell* cell;
+    const ob::State* p;
+    const ob::State* q;
 };
 
 typedef deque<PathSegment> CellPath;
@@ -36,30 +36,33 @@ public:
 
     // data
     vector<const ob::State*> samples_in_cell_;
+    // lower bounds
     vector<double>           lower_;
+    // upper bounds
     vector<double>           upper_;
-    vector<double>           range_;
+    // center of the cell
     vector<double>           centroid_;
+    // neighboring cells
     vector<Cell*>            neighbors_;
     Cell*                    parent_;
     Cell*                    lo_child_;
     Cell*                    up_child_;
 
     CellType                 type_;
-    unsigned int             region_type_;
+    unsigned int             region_type_;    
 
-    // used for A* search
+    // So that space information can be accessed from within cell
+    static ob::SpaceInformationPtr si_;
+    static void setSI(const ob::SpaceInformationPtr&);
+
+    // for A* search
     unsigned int             visited_;
     unsigned int             closed_;
     double                   init_dist_;
     double                   goal_dist_;
     Cell*                    previous_node_;  
     static unsigned int      num_samples;
-    
-    
-    static ob::SpaceInformationPtr si_;
-    static void setSI(const ob::SpaceInformationPtr&);
-
+   
     // Constructor 
     Cell(const ompl::base::SpaceInformationPtr& si);
     Cell(const vector<double>& min_vals, 
@@ -78,7 +81,8 @@ public:
     bool isRightBoundary(unsigned int i) const;
     bool isLeftAndRightBoundary(unsigned int i) const;
     CellType getType() const;
-    Cell_ID getID() const;  
+    Cell_ID  getID() const;  
+    double   getMeasure() const;
     void strip();
     void removeLeftBoundary(unsigned int i);
     void removeRightBoundary(unsigned int i);
@@ -119,7 +123,6 @@ bool overlap(double lo1, double hi1, double lo2, double hi2);
 bool disjoint(double lo1, double hi1, double lo2, double hi2);
 bool areAdjacent(const Cell& a, const Cell& b);
 
-// INLINE FUNCTIONS
 inline bool Cell::isEmpty() const
 {
     return samples_in_cell_.empty();

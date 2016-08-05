@@ -49,13 +49,9 @@ Cell::Cell(const vector<double>& min_vals,
     assert(min_vals.size() == max_vals.size());
     unsigned int i = min_vals.size();
     centroid_.resize(i);
-    range_.resize(i);
     for ( ; (i)-- != 0; ) {
-	range_[i] = max_vals[i]-min_vals[i];
-	assert(min_vals[i] < max_vals[i]);
 	centroid_[i] = 0.5 * (min_vals[i] + max_vals[i]);
     }
-
      ++num_cells;
 }
 
@@ -82,9 +78,7 @@ Cell::Cell(const vector<double>& min_vals,
 
     unsigned int i = lower_.size();
     centroid_.resize(i);
-    range_.resize(i);
     for ( ; (i)-- != 0; ) {
-	range_[i] = max_vals[i]-min_vals[i];
 	centroid_[i] = 0.5 * (lower_[i] + upper_[i]);
 	assert(lower_[i] <= upper_[i]);
     }
@@ -138,7 +132,6 @@ void Cell::strip()
 bool Cell::addSample(const ob::State* sample, RedundancyCheck check)
 {
   ++num_samples;
-  // copy and add state
   ob::State* p_sample =   si_->getStateSpace()->cloneState(sample);
   samples_in_cell_.push_back(p_sample);
   return p_sample != 0;
@@ -313,6 +306,14 @@ unsigned int Cell::getNumCells()
     return num_cells;
 }
 
+double Cell::getMeasure() const
+{
+    double measure = 1.0;
+    for (unsigned int i = 0; i < lower_.size(); ++i)
+	measure *= (upper_[i]-lower_[i]);
+    return measure;
+}
+
 unsigned int Cell::getNumSamples()
 {
   return num_samples;
@@ -322,10 +323,18 @@ void Cell::print(ostream& os) const
 {
   const unsigned dim = lower_.size();
   os << "------------------\n";
-  os << "cell id: " << getID() << "\n"
-    << "("<<upper_[0]<<", "<<upper_[1]<<"), ("<<lower_[0]<<", "<<lower_[1]<<")\n"
-      //<< "dim: "     << dim     << "\n"
-     << "type: ";
+  os << "dim: "<<dim;
+  os << "\ncell id: " << getID() << "\n(";
+  for (int i = 0; i < dim-1; ++i)
+  {
+      os << upper_[i] << ", ";
+  }
+  os << upper_[dim-1] << ") (";
+  for (int i = 0; i < dim-1; ++i)
+      os << lower_[i] << ", ";
+  os  << lower_[dim-1]<< ")\nmeasure: " << this->getMeasure();
+
+  os << "\ntype: ";
   if (type_ == POSS_FREE) {
     os << "POSS_FREE\n";
   } else if (type_ == POSS_FULL) {
@@ -333,6 +342,7 @@ void Cell::print(ostream& os) const
   } else {
     os << "MIXED\n";
   }
+
   os << "region: ";
   if (region_type_ == REG_UNSPEC) {
     os << " unspecified\n";
@@ -346,10 +356,5 @@ void Cell::print(ostream& os) const
   
   os << "num_neighbors: "    << neighbors_.size()       << "\n"
      << "num_samples:   "    << samples_in_cell_.size() << "\n";
-  // os << "neigbors: (";
-  // for(int i=0; i<neighbors_.size();++i)
-  //     os << neighbors_[i]->getID() << " ";
 
-  // os << ")";
-  // os << "\n";
 }

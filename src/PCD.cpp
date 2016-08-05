@@ -7,14 +7,12 @@
 #include <iostream>
 
 #define DEF_MAX_NEW_FREE_CELLS 10
-#define DEF_MAX_NUM_ITER 100000
 
 // ======================== CONSTRUCTORS ============================
     og::PCD::PCD(const ob::SpaceInformationPtr &si) : 
 	ob::Planner(si, "PCD"),
 	astar_timer_(0),
 	pcd_graph_(0),
-	max_num_iter_(DEF_MAX_NUM_ITER),
 	collision_checks_(0),
 	max_new_free_cells_(DEF_MAX_NEW_FREE_CELLS),
 	max_step_size_(1.0 *3.14/180),
@@ -28,20 +26,13 @@
 	Planner::specs_.provingSolutionNonExistence = false;
     }
 
-// free memory in destructor
-og::PCD::~PCD()
-{
-    freeMemory();
-}
-void ompl::geometric::PCD::freeMemory()
-{
-    1;
-}
+
 
 // =============================== PROBLEM SETUP ========================================
 void og::PCD::setProblemDefinition(const ob::ProblemDefinitionPtr &pdef)
 {
     Planner::setProblemDefinition(pdef);
+    pis_.restart();
 }
 
 void og::PCD::setup()
@@ -90,8 +81,8 @@ void og::PCD::getSpaceLimits(ob::StateSpacePtr stateSpace, og::PCD::SpaceBounds&
 void og::PCD::clear()
 {
     Planner::clear();
-    sampler_.reset();
     collision_checks_ = 0;
+    cell_division_.clear();
 }
 
 void og::PCD::getPlannerData(ob::PlannerData &data) const
@@ -108,31 +99,31 @@ ob::PlannerStatus og::PCD::solve(const ob::PlannerTerminationCondition &ptc)
     unsigned int next_free_cells_sampling       = free_cells_sample_period;
     CellPath cell_path;
     bool success            = false;
-    bool approximate        = false;
-    bool found_path         = false;
+    bool approximate        = true;
     unsigned int num_iter   = 0;
     start_ptr =   pis_.nextStart();  
     goal_ptr  =   pis_.nextGoal();
-    assert(isSatisfied(start_ptr));
-    assert(isSatisfied(goal_ptr));
+
     pcd_graph_ = Cell::createGraph(start_ptr,goal_ptr,spaceBounds_.min,spaceBounds_.max);
-    int type_it;
 
     checkValidity();
+    cell_division_.clear();
+    getAllCells(cell_division_, pcd_graph_.front());
+    all_cell_divisions_.push_back(cell_division_);
     while (ptc == false && !success) 
     {
-	ompl::time::point start_time = ompl::time::now(); 	
+	ompl::time::point start_time = ompl::time::now(); 
 	++num_iter;
-	found_path = (findCellPath(cell_path)); 
-	if (found_path)
+	if (findCellPath(cell_path))
 	{
-	    type_it = 1;
 	    Cell::getPath(cell_path);
 	    if (checkPath(cell_path)) 
 	    {
 		success = true;
 	    }
-
+	    cell_division_.clear();
+	    getAllCells(cell_division_, pcd_graph_.front());
+	    all_cell_divisions_.push_back(cell_division_);
 	} else {
 	    if (pcd_graph_.size() >= next_free_cells_sampling) 
 	    {
@@ -142,18 +133,21 @@ ob::PlannerStatus og::PCD::solve(const ob::PlannerTerminationCondition &ptc)
 	    {
 		sampleOccCells();		
 	    }	
+	    cell_division_.clear();
+	    getAllCells(cell_division_, pcd_graph_.front());
+	    all_cell_divisions_.push_back(cell_division_);
 	}
+
     }
-    if (success == true)
+
+    og::PathGeometric *path = new og::PathGeometric(si_);
+    path->append(cell_path[0].p);
+    for (int i= 0 ; i <  cell_path.size(); ++i)
     {
-    	og::PathGeometric *path = new og::PathGeometric(si_);
-    	path->append(cell_path[0].p);
-    	for (int i= 0 ; i <  cell_path.size(); ++i)
-    	{
-    	    path->append(cell_path[i].q);
-    	}
-    	pdef_->addSolutionPath(ob::PathPtr(path));
+	path->append(cell_path[i].q);
     }
+    pdef_->addSolutionPath(ob::PathPtr(path));
+    cell_division_.clear();
     getAllCells(cell_division_, pcd_graph_.front());
     return ob::PlannerStatus(success , approximate);
 }
@@ -227,7 +221,6 @@ bool og::PCD::findCellPath(CellPath& cell_path)
 		}
 	    }
 	}
-
 	const unsigned int n = new_cells.size();
 	for (i = 0; i < n; ++i) 
 	{
@@ -291,7 +284,7 @@ Cell* og::PCD::getNonMixedCell(Cell* cell, const ob::State* state)
     return leaf;
 }
 
-int og::PCD::nChecks()
+int og::PCD::getNChecks()
 {
     return collision_checks_;
 }
@@ -300,37 +293,36 @@ int og::PCD::nChecks()
 
 bool og::PCD::checkPath(CellPath& cell_path)
 {
-    // if (!parallelCheck(cell_path)) 
-    // 	return false;
-    const unsigned int n = cell_path.size();
-
-    for (unsigned int i = 1; i < n; ++i)  
+    if (!parallelCheck(cell_path)) 
     {
-	const ob::State* state = cell_path[i].p;
-	if (!isSatisfied(state)) 
-	{
-	    Cell* cell = cell_path[i].cell;
-	    splitCell(cell, state, split_directions_, pcd_graph_);
-	    sampleOccCell(getNonMixedCell(cell, state), 100);
-	    return false;
-	}
+    	return false;
+    }    
+    for (unsigned int i = 1; i < cell_path.size(); ++i)  
+    {
+    	const ob::State* state = cell_path[i].p;
+    	if (!isSatisfied(state)) 
+    	{
+    	    Cell* cell = cell_path[i].cell;
+    	    splitCell(cell, state, split_directions_, pcd_graph_);
+    	    sampleOccCell(getNonMixedCell(cell, state), 100);
+    	    //Cell* sampleCell = getNonMixedCell(cell, state);
+    	    //sampleOccCell(sampleCell, round(sampleCell->getMeasure()*100));
+    	    return false;
+    	}
     }
     return serialCheck(cell_path);
 }
 
 bool og::PCD::parallelCheck(CellPath& cell_path)
 {
-    static const double keys[] = {0.5, 0.25, 0.75, 0.125, 0.375, 0.625, 0.875};   
-    const unsigned int NUM_CHECKS = (sizeof(keys) / sizeof((keys)[0]));
-    const unsigned int n          = cell_path.size();
+    const vector<double> keys{0.5, 0.25, 0.75, 0.125, 0.625, 0.375, 0.875};  
+    const unsigned int n = cell_path.size();
 
     ob::State* state =  si_->getStateSpace()->allocState();
-
-    for (unsigned int j = 0; j < NUM_CHECKS; ++j) 
+    for (unsigned int j = 0; j < keys.size(); ++j) 
     {
 	const double t = keys[j];
 	unsigned int i = n;
-	// we test the path backwards because it gives shorter planning times
 	for  ( ; (i)-- != 0; )  
 	{
 	    Cell* cell = cell_path[i].cell;
@@ -349,9 +341,9 @@ bool og::PCD::parallelCheck(CellPath& cell_path)
     return true;
 }
 
+
 bool og::PCD::serialCheck(CellPath& cell_path)
 {
-    // loop over each segment
     unsigned int i = cell_path.size();
     for  ( ; (i)-- != 0; )  
     {
@@ -368,11 +360,10 @@ bool og::PCD::isSegmentOK(const ob::State* from,
     assert(isSatisfied(from));
     assert(isSatisfied(to));
 
-    // cell is here to enable split or add sample?
     assert(cell->contains(from));
     assert(cell->contains(to));
   
-    const unsigned int max_samples_to_add = 10; // why?
+    const unsigned int max_samples_to_add = 10;
     unsigned int num_samples_added        = 0;
   
     deque<pair<double, double> > intervals;
@@ -395,9 +386,11 @@ bool og::PCD::isSegmentOK(const ob::State* from,
 	    {
 		assert(cell->getType() == Cell::POSS_FREE);
 		splitCell(cell, state_high, split_directions_, pcd_graph_);
+		//Cell* sampleCell = getNonMixedCell(cell, state_high);
+		//sampleOccCell(sampleCell, round(sampleCell->getMeasure()*100));
 		sampleOccCell(getNonMixedCell(cell, state_high), 100);
 		return false;
-	    } else //if (num_samples_added < max_samples_to_add) 
+	    } else 
 	    {
 		cell->addSample(state_high);
 		++num_samples_added;
@@ -426,8 +419,6 @@ void  og::PCD::splitCell(Cell*              cell,
 			 PCD_Graph&         cell_graph)
 {
     const unsigned int  dim = si_->getStateDimension();
-    // preconditions
-    assert(valid_directions.size() == dim);
     assert(find(valid_directions.begin(), valid_directions.end(), true) != valid_directions.end());
     assert(cell->parent_ == 0 || cell->parent_->type_ == Cell::MIXED);
     assert(cell->lo_child_ == 0 && cell->up_child_ == 0);  
@@ -435,8 +426,7 @@ void  og::PCD::splitCell(Cell*              cell,
     assert(cell->contains(state));
     assert((cell->type_ == Cell::POSS_FREE && !isSatisfied(state)) ||
 	   (cell->type_ == Cell::POSS_FULL &&  isSatisfied(state)));
-    assert((cell->contains(start_ptr)   && cell->type_ == Cell::POSS_FREE) || !cell->contains(start_ptr));
-    assert((cell->contains(goal_ptr) && cell->type_ == Cell::POSS_FREE) || !cell->contains(goal_ptr));
+
   
     const bool midpoint_split                = false;
     const Cell::CellType orig_cell_type  = cell->type_;
@@ -592,8 +582,8 @@ bool og::PCD::findSplitDirection(const ob::State*    state1,
 	    if (valid_directions[i]) 
 	    {
 		// min value
-		const double epsilon = (((1.0e-8) > ( (cell->range_[i]) / 1e3))? 
-					( (cell->range_[i]) / 1e3) : 
+		const double epsilon = (((1.0e-8) > ( (cell->upper_[i]-cell->lower_[i]) / 1e3))? 
+					( (cell->upper_[i]-cell->lower_[i]) / 1e3) : 
 					(1.0e-8));
 		double 	diff = distance(state1, state2, i) ;
 		if (diff > epsilon) 
@@ -623,7 +613,9 @@ void og::PCD::getAllCells(vector<Cell*>& cells, Cell* node)
 {
     if (node->lo_child_ == 0 && node->up_child_ == 0) 
     {
-	cells.push_back(node);
+	Cell* node_copy_ptr;
+	node_copy_ptr = new Cell(*(node));
+	cells.push_back(node_copy_ptr);
     }else if (node->lo_child_ != 0 || node->up_child_ != 0)
     {
 	if(node->lo_child_ != 0)
@@ -735,7 +727,7 @@ void og::PCD::sampleOccCells()
 
     const unsigned int numObstCells      = obstCells.size();
     const unsigned int numInterestingCells    = interestingCells.size();
-    const unsigned int max_interesting_trials = (rng_.uniform01() < 0.8)? 10 : 0; // 30
+    const unsigned int max_interesting_trials = (rng_.uniform01() < 0.8)? 10 : 0;
 
     ob::State* state;
     unsigned int num_new_cells  = 0;
@@ -801,7 +793,6 @@ void og::PCD::sampleOccCell(Cell* occ_cell, unsigned int max_num_tries)
     ob::State* sample;
     while (num_tries < max_num_tries) 
     {
-	// sample from occ_cell
 	sample = occ_cell->getSample(rng_);
 	if (isSatisfied(sample)) 
 	{
