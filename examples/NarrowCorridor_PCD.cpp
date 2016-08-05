@@ -1,5 +1,5 @@
-#include "Cell.h"
-#include "PCD.h"
+#include "../Cell.h"
+#include "../PCD.h"
 #include <ompl/config.h>
 #include <ompl/base/SpaceInformation.h>
 #include <ompl/base/spaces/RealVectorStateSpace.h>
