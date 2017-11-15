@@ -13,4 +13,5 @@ The computed cells are shown in red and green. The real obstacle is shown stripe
 
 ## References
 [1] http://ompl.kavrakilab.org/
+
 [2] http://ieeexplore.ieee.org/document/1307193/
