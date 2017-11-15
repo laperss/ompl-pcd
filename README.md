@@ -10,7 +10,7 @@ An example of a planned path:
 
 ![Example path](https://user-images.githubusercontent.com/4593893/32837848-5a766340-ca0f-11e7-8747-9cda881bbd9e.png)
 
-The computed cells are shown in red and green. The real obstacle is shown striped (black).
+The computed cells are shown in red and green. The real obstacle is shown striped (black). A path found from this decomposition is shown in blue. 
 
 ## References
 [1] http://ieeexplore.ieee.org/document/1307193/
