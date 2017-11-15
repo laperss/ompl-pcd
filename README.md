@@ -1,7 +1,7 @@
 # PCD for OMPL
-Probabilistic Cell Decomposition method implemented for OMPL. 
+Probabilistic Cell Decomposition method implemented for the Open Motion-Planning Library (OMPL) [1]. 
 
-PCD is a path planner made for high-dimensional static configuration spaces. [1]
+PCD is a path planner made for high-dimensional static configuration spaces. [2]
 Some code has been adapted from a previous implementation found [here](http://copp.cvs.sourceforge.net/). 
 
 ## Example
@@ -12,4 +12,5 @@ An example of a planned path:
 The computed cells are shown in red and green. The real obstacle is shown striped (black). A path found from this decomposition is shown in blue. 
 
 ## References
-[1] http://ieeexplore.ieee.org/document/1307193/
+[1] http://ompl.kavrakilab.org/
+[2] http://ieeexplore.ieee.org/document/1307193/
